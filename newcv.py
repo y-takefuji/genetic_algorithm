@@ -110,6 +110,13 @@ def cv_xgb(features, X, y):
     scores = cross_val_score(clf, X[features], y, cv=cv5, scoring='accuracy')
     return round(scores.mean(), 4)
 
+# Top-4 (reduced) accuracy: printed only, not included in Table 1
+def cv_rf4(features, X, y):
+    return cv_rf(features, X, y)
+
+def cv_xgb4(features, X, y):
+    return cv_xgb(features, X, y)
+
 def cv_rf_full(features, X, y):
     return _cv_full(RandomForestClassifier(random_state=42), features, X, y)
 
@@ -144,8 +151,10 @@ rf_model2.fit(X_rf_reduced, y)
 rf_imp2      = pd.Series(rf_model2.feature_importances_, index=X_rf_reduced.columns)
 rf_ranked2   = rf_imp2.sort_values(ascending=False)
 rf_top4      = list(rf_ranked2.index[:4])
+rf_top4_acc  = cv_rf4(rf_top4, X, y)
 print(f"RF Highest Feature Removed: {rf_highest}")
 print(f"RF Top 4 (reduced): {rf_top4}")
+print(f"RF CV5 Accuracy (top 4): {rf_top4_acc}")
 
 # ============================================================
 # 3. XGBOOST Feature Selection
@@ -174,8 +183,10 @@ xgb_model2.fit(X_xgb_reduced, y)
 xgb_imp2      = pd.Series(xgb_model2.feature_importances_, index=X_xgb_reduced.columns)
 xgb_ranked2   = xgb_imp2.sort_values(ascending=False)
 xgb_top4      = list(xgb_ranked2.index[:4])
+xgb_top4_acc  = cv_xgb4(xgb_top4, X, y)
 print(f"XGB Highest Feature Removed: {xgb_highest}")
 print(f"XGB Top 4 (reduced): {xgb_top4}")
+print(f"XGB CV5 Accuracy (top 4): {xgb_top4_acc}")
 
 # ============================================================
 # 4. GENETIC ALGORITHM Feature Selection (Pure GA)
@@ -277,10 +288,12 @@ for idx in top_half_idx:
     for j, fi in enumerate(remaining_idx_map):
         feature_freq2[j] += population[idx][fi]
 
-ga_ranked2 = pd.Series(feature_freq2, index=remaining_features).sort_values(ascending=False)
-ga_top4    = list(ga_ranked2.index[:4])
+ga_ranked2  = pd.Series(feature_freq2, index=remaining_features).sort_values(ascending=False)
+ga_top4     = list(ga_ranked2.index[:4])
+ga_top4_acc = cv_rf4(ga_top4, X, y)
 print(f"GA Highest Feature Removed: {ga_highest}")
 print(f"GA Top 4 (reduced): {ga_top4}")
+print(f"GA CV5 Accuracy (top 4): {ga_top4_acc}")
 
 # ============================================================
 # 4B. GA-SHAP Feature Selection (Hybrid GA + SHAP)
@@ -385,7 +398,7 @@ print(f"\nGA-SHAP Top 5: {gashap_top5}")
 print(f"GA-SHAP CV5 Accuracy (top 5): {gashap_top5_acc}")
 
 # Remove highest and compute top 4
-gashap_highest         = gashap_ranked.index[0]
+gashap_highest            = gashap_ranked.index[0]
 remaining_features_gashap = [f for f in feature_names if f != gashap_highest]
 remaining_idx_map_gashap  = [feature_names.index(f) for f in remaining_features_gashap]
 
@@ -394,10 +407,12 @@ for idx in top_half_idx_gashap:
     for j, fi in enumerate(remaining_idx_map_gashap):
         feature_freq2_gashap[j] += population_gashap[idx][fi]
 
-gashap_ranked2 = pd.Series(feature_freq2_gashap, index=remaining_features_gashap).sort_values(ascending=False)
-gashap_top4    = list(gashap_ranked2.index[:4])
+gashap_ranked2  = pd.Series(feature_freq2_gashap, index=remaining_features_gashap).sort_values(ascending=False)
+gashap_top4     = list(gashap_ranked2.index[:4])
+gashap_top4_acc = cv_rf4(gashap_top4, X, y)
 print(f"GA-SHAP Highest Feature Removed: {gashap_highest}")
 print(f"GA-SHAP Top 4 (reduced): {gashap_top4}")
+print(f"GA-SHAP CV5 Accuracy (top 4): {gashap_top4_acc}")
 
 # ============================================================
 # 5. RF-SHAP Feature Selection
@@ -436,8 +451,10 @@ rf_shap_values2  = rf_explainer2.shap_values(X_shap_sample2)
 rf_shap_abs2     = extract_shap_values(rf_shap_values2)
 rfshap_ranked2   = pd.Series(rf_shap_abs2, index=X_rfshap_reduced.columns).sort_values(ascending=False)
 rfshap_top4      = list(rfshap_ranked2.index[:4])
+rfshap_top4_acc  = cv_rf4(rfshap_top4, X, y)
 print(f"RF-SHAP Highest Feature Removed: {rfshap_highest}")
 print(f"RF-SHAP Top 4 (reduced): {rfshap_top4}")
+print(f"RF-SHAP CV5 Accuracy (top 4): {rfshap_top4_acc}")
 
 # ============================================================
 # 6. XGB-SHAP Feature Selection
@@ -472,47 +489,92 @@ xgb_shap_values2  = xgb_explainer2.shap_values(X_shap_sample3)
 xgb_shap_abs2     = extract_shap_values(xgb_shap_values2)
 xgbshap_ranked2   = pd.Series(xgb_shap_abs2, index=X_xgbshap_reduced.columns).sort_values(ascending=False)
 xgbshap_top4      = list(xgbshap_ranked2.index[:4])
+xgbshap_top4_acc  = cv_xgb4(xgbshap_top4, X, y)
 print(f"XGB-SHAP Highest Feature Removed: {xgbshap_highest}")
 print(f"XGB-SHAP Top 4 (reduced): {xgbshap_top4}")
+print(f"XGB-SHAP CV5 Accuracy (top 4): {xgbshap_top4_acc}")
 
 # ============================================================
-# 7. FEATURE AGGLOMERATION (FA)
+# 7. FEATURE AGGLOMERATION (FA) - pure FA, no RF, no target
+#    Score = combination of (a) closeness to the cluster centroid and
+#    (b) feature variance. Features are ranked ACROSS ALL clusters.
 # ============================================================
 print("\n" + "=" * 60)
 print("METHOD 7: Feature Agglomeration (FA)")
 print("=" * 60)
 
-n_clusters = 5
-fa = FeatureAgglomeration(n_clusters=n_clusters)
-fa.fit(X)
+FA_WEIGHT = 0.5   # weight of the centroid component (1 - FA_WEIGHT = variance component)
 
-labels = fa.labels_
+def _minmax(s):
+    """Min-max normalize a pd.Series to [0, 1] (constant -> zeros)."""
+    rng = s.max() - s.min()
+    if rng == 0:
+        return s * 0.0
+    return (s - s.min()) / rng
+
+def fa_score_features(X_df, n_clusters, w=FA_WEIGHT):
+    """
+    Pure FA scoring (unsupervised: no target, no RF).
+    1) Cluster the features with FeatureAgglomeration.
+    2) Cluster centroid = mean of the member features (per sample).
+       Centroid score = |corr(feature, its cluster centroid)|
+       (a singleton cluster is its own centroid -> score 1.0).
+    3) Variance score = min-max normalized feature variance.
+    4) FA score = w * centroid score + (1 - w) * variance score.
+    All features are ranked together across clusters.
+    Returns cluster labels, ranked FA scores, centroid scores, variance scores.
+    """
+    fa_model = FeatureAgglomeration(n_clusters=n_clusters)
+    fa_model.fit(X_df)
+    labels_ = fa_model.labels_
+
+    centroid_score = {}
+    for c in np.unique(labels_):
+        members  = [f for f, l in zip(X_df.columns, labels_) if l == c]
+        centroid = X_df[members].mean(axis=1)
+        for f in members:
+            if len(members) == 1:
+                centroid_score[f] = 1.0
+            else:
+                r = np.corrcoef(X_df[f].values, centroid.values)[0, 1]
+                centroid_score[f] = float(abs(r)) if np.isfinite(r) else 0.0
+
+    centroid_score = pd.Series(centroid_score)[X_df.columns]
+    var_score      = _minmax(X_df.var())[X_df.columns]
+
+    fa_score = w * centroid_score + (1 - w) * var_score
+    return labels_, fa_score.sort_values(ascending=False), centroid_score, var_score
+
+n_clusters = 5
+fa_labels, fa_ranked, fa_centroid, fa_var = fa_score_features(X, n_clusters)
+
 print(f"\nFeature Cluster Assignments:")
-for feat, lbl in zip(feature_names, labels):
+for feat, lbl in zip(feature_names, fa_labels):
     print(f"  {feat}: Cluster {lbl}")
 
-rf_fa          = RandomForestClassifier(random_state=42)
-rf_fa.fit(X, y)
-fa_importances = pd.Series(rf_fa.feature_importances_, index=feature_names).sort_values(ascending=False)
+print("\nFA Components (centroid score, normalized variance):")
+print(pd.DataFrame({'centroid_score': fa_centroid, 'variance_score': fa_var}).round(4))
 
-print("\nFA: RF Importances for all features (ranked):")
-print(fa_importances.round(4))
+print(f"\nFA Combined Score (w={FA_WEIGHT} centroid + {1-FA_WEIGHT} variance, ranked):")
+print(fa_ranked.round(4))
 
-fa_top5     = list(fa_importances.index[:5])
+fa_top5     = list(fa_ranked.index[:5])      # top 5 across all clusters
 fa_top5_acc = cv_xgb(fa_top5, X, y)
 print(f"\nFA Top 5 (across all clusters): {fa_top5}")
 print(f"FA CV5 Accuracy (top 5): {fa_top5_acc}")
 
-fa_highest   = fa_importances.index[0]
+# Remove the highest-ranked feature, re-run FA with 4 clusters on the rest
+fa_highest   = fa_ranked.index[0]
 X_fa_reduced = X.drop(columns=[fa_highest])
-fa2 = FeatureAgglomeration(n_clusters=min(4, X_fa_reduced.shape[1]))
-fa2.fit(X_fa_reduced)
-rf_fa2          = RandomForestClassifier(random_state=42)
-rf_fa2.fit(X_fa_reduced, y)
-fa_importances2 = pd.Series(rf_fa2.feature_importances_, index=X_fa_reduced.columns).sort_values(ascending=False)
-fa_top4         = list(fa_importances2.index[:4])
+fa_labels2, fa_ranked2, _, _ = fa_score_features(
+    X_fa_reduced, min(4, X_fa_reduced.shape[1])
+)
+
+fa_top4     = list(fa_ranked2.index[:4])     # top 4 across all clusters
+fa_top4_acc = cv_xgb4(fa_top4, X, y)
 print(f"FA Highest Feature Removed: {fa_highest}")
-print(f"FA Top 4 (reduced): {fa_top4}")
+print(f"FA Top 4 (reduced, across all clusters): {fa_top4}")
+print(f"FA CV5 Accuracy (top 4): {fa_top4_acc}")
 
 # ============================================================
 # 8. HIGHLY VARIABLE GENE SELECTION (HVGS)
@@ -527,7 +589,7 @@ hvgs_ranked      = feature_variance.sort_values(ascending=False)
 print("\nHVGS Feature Variance (ranked):")
 print(hvgs_ranked.round(4))
 
-hvgs_top5 = list(hvgs_ranked.index[:5])
+hvgs_top5     = list(hvgs_ranked.index[:5])
 hvgs_top5_acc = cv_xgb(hvgs_top5, X, y)
 print(f"\nHVGS Top 5: {hvgs_top5}")
 print(f"HVGS CV5 Accuracy (top 5): {hvgs_top5_acc}")
@@ -536,8 +598,10 @@ hvgs_highest   = hvgs_ranked.index[0]
 X_hvgs_reduced = X.drop(columns=[hvgs_highest])
 hvgs_variance2 = X_hvgs_reduced.var().sort_values(ascending=False)
 hvgs_top4      = list(hvgs_variance2.index[:4])
+hvgs_top4_acc  = cv_xgb4(hvgs_top4, X, y)
 print(f"HVGS Highest Feature Removed (highest variance): {hvgs_highest}")
 print(f"HVGS Top 4 (reduced): {hvgs_top4}")
+print(f"HVGS CV5 Accuracy (top 4): {hvgs_top4_acc}")
 
 # ============================================================
 # 9. SPEARMAN Correlation Feature Selection
@@ -556,7 +620,7 @@ spearman_ranked = pd.Series(spearman_scores).sort_values(ascending=False)
 print("\nSpearman |Correlation| with target (ranked):")
 print(spearman_ranked.round(4))
 
-spearman_top5 = list(spearman_ranked.index[:5])
+spearman_top5     = list(spearman_ranked.index[:5])
 spearman_top5_acc = cv_xgb(spearman_top5, X, y)
 print(f"\nSpearman Top 5: {spearman_top5}")
 print(f"Spearman CV5 Accuracy (top 5): {spearman_top5_acc}")
@@ -567,20 +631,23 @@ spearman_scores2 = {}
 for feat in X_sp_reduced.columns:
     corr2, _ = spearmanr(X_sp_reduced[feat], y)
     spearman_scores2[feat] = abs(corr2)
-spearman_ranked2 = pd.Series(spearman_scores2).sort_values(ascending=False)
-spearman_top4    = list(spearman_ranked2.index[:4])
+spearman_ranked2  = pd.Series(spearman_scores2).sort_values(ascending=False)
+spearman_top4     = list(spearman_ranked2.index[:4])
+spearman_top4_acc = cv_xgb4(spearman_top4, X, y)
 print(f"Spearman Highest Feature Removed: {spearman_highest}")
 print(f"Spearman Top 4 (reduced): {spearman_top4}")
+print(f"Spearman CV5 Accuracy (top 4): {spearman_top4_acc}")
 
 # ============================================================
 # 10. SUMMARY TABLE (Table 1: with 95% CI and class-wise F1)
+#     Note: top-4 accuracy is printed above but NOT included here.
 # ============================================================
 print("\n" + "=" * 60)
 print("TABLE 1")
 print("=" * 60)
 
 # (method name, evaluation function, top 5 features, top 4 features)
-# Classifier per method follows the original script:
+# Classifier per method:
 #   RF / GA / GA-SHAP / RF-SHAP -> Random Forest
 #   XGB / XGB-SHAP / FA / HVGS / Spearman -> XGBoost
 method_info = [
